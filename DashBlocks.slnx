@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="DashBlocks/dashblocks.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+</Solution>
