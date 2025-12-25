@@ -1,136 +1,237 @@
 # DashBlocks
-## 프로젝트 구조
+
+C++ 게임 로직과 Python(Flask + Socket.IO) 서버,
+React(Vite) 프런트엔드로 구성된 **실시간 오목(Gomoku) 게임 프로젝트**입니다.
+Docker 기반 실행을 기본으로 하며, 로컬 개발도 지원합니다.
+
+---
+
+## 1. 프로젝트 구조
 
 ```
-eslint.config.js
-index.html
-package.json
-README.md
-vite.config.ts
-client/
-	main.py
-public/
-server/
-	app_minimal.py
-	app.py
-	game_logic.cpp
-	requirements.txt
-	server.cpp
-	test.cpp
-	test.py
-	__pycache__/
-	ai/
-		gomoku_ai.cpp
-src/
-	App.css
-	App.tsx
-	Board.tsx
-	index.css
-	main.tsx
-	Player.jsx
+[Client / Browser]
+└─ React (Vite)
+   ├─ src/main.tsx
+   │  └─ React 앱 시작
+   │
+   ├─ src/App.tsx
+   │  ├─ Socket.IO 서버 연결
+   │  ├─ 서버 이벤트 수신
+   │  │  ├─ joined
+   │  │  ├─ room_state
+   │  │  └─ connection_response
+   │  └─ 입력 이벤트 전송
+   │     ├─ move
+   │     ├─ place_stone
+   │     └─ ai_move
+   │
+   ├─ src/Board.tsx
+   │  └─ 서버에서 받은 board 상태 렌더링
+   │
+   └─ src/Player.jsx
+      └─ 플레이어 커서 위치 표시
+
+        │
+        │ Socket.IO (WebSocket)
+        ▼
+
+[Server / Python]
+└─ Flask + Flask-SocketIO
+   ├─ server/app.py
+   │  ├─ 서버 초기화
+   │  │  ├─ eventlet monkey patch
+   │  │  └─ Socket.IO 설정
+   │  │
+   │  ├─ C++ DLL 로드
+   │  │  └─ game_logic.dll (ctypes)
+   │  │
+   │  ├─ 방 / 플레이어 관리
+   │  │  ├─ rooms { password -> [sid] }
+   │  │  └─ room_id / player_id 생성
+   │  │
+   │  ├─ Socket.IO 이벤트 처리
+   │  │  ├─ connect
+   │  │  ├─ join
+   │  │  ├─ move
+   │  │  ├─ place_stone
+   │  │  └─ ai_move
+   │  │
+   │  ├─ broadcast_room()
+   │  │  ├─ C++ 상태 조회
+   │  │  ├─ JSON 변환
+   │  │  └─ 방 전체 브로드캐스트
+   │  │
+   │  └─ 서버 실행 진입점
+   │
+   └─ server/requirements.txt
+      └─ Python 의존성
+
+        │
+        │ ctypes (DLL 호출)
+        ▼
+
+[Core Logic / C++]
+└─ Game Logic (DLL)
+   ├─ server/game_logic.cpp
+   │  ├─ 방별 게임 상태 관리
+   │  ├─ 바둑판 상태 저장
+   │  ├─ 플레이어 위치 관리
+   │  ├─ 돌 배치 검증
+   │  └─ 상태 조회 함수 제공
+   │
+   ├─ server/ai/gomoku_ai.cpp
+   │  ├─ 네가맥스 기반 AI
+   │  ├─ 후보 수 탐색
+   │  └─ 최적 수 반환
+   │
+   └─ game_logic.dll
+      └─ Python에서 로드되는 핵심 로직
 ```
 
-## 실행 방법
+---
 
-이 프로젝트는 Docker를 사용하여 쉽게 빌드하고 실행할 수 있습니다. 또는 프런트엔드와 백엔드를 개별적으로 로컬에서 실행할 수도 있습니다.
+## 2. 기술 스택
 
-### Docker를 이용한 실행 (권장)
+* **Frontend**
 
-1.  **Docker 이미지 빌드:**
-    프로젝트 루트 디렉토리에서 다음 명령어를 실행하여 Docker 이미지를 빌드합니다. 이 과정은 프런트엔드와 백엔드를 모두 포함합니다.
-    ```bash
-    docker build -t dashblocks .
-    ```
+  * React + TypeScript
+  * Vite
+* **Backend**
 
-2.  **Docker 컨테이너 실행:**
-    빌드가 완료되면 다음 명령어를 실행하여 컨테이너를 백그라운드에서 시작합니다. `5000`번 포트가 호스트 머신으로 노출됩니다.
-    ```bash
-    docker run -d -p 5000:5000 --name dashblocks-game dashblocks
-    ```
-    *(`-d` 플래그는 컨테이너를 백그라운드에서 실행하며, `--name`으로 컨테이너에 `dashblocks-game`이라는 이름을 부여합니다.)*
+  * Python (Flask, Flask-SocketIO, eventlet)
+  * ctypes 기반 C++ 연동
+* **Game Logic / AI**
 
-3.  **애플리케이션 접속:**
-    컨테이너가 실행되면 웹 브라우저를 열고 다음 주소로 이동하여 애플리케이션에 접속할 수 있습니다:
-    [http://localhost:5000](http://localhost:5000)
+  * C++ (Shared Library: `.dll` / `.so`)
+* **Infra**
 
-4.  **컨테이너 로그 확인 (선택 사항):**
-    실행 중인 컨테이너의 로그를 확인하려면 다음 명령어를 사용합니다:
-    ```bash
-    docker logs dashblocks-game
-    ```
+  * Docker (권장 실행 방식)
 
-5.  **컨테이너 중지:**
-    애플리케이션 사용을 마쳤으면 다음 명령어로 컨테이너를 중지할 수 있습니다:
-    ```bash
-    docker stop dashblocks-game
-    ```
+---
 
-6.  **컨테이너 삭제 (선택 사항):**
-    컨테이너를 완전히 삭제하려면 중지 후 다음 명령어를 사용합니다:
-    ```bash
-    docker rm dashblocks-game
-    ```
+## 3. 실행 방법 (Docker 권장)
 
-### 로컬에서 개별 실행 (대안)
+### 3.1 Docker 이미지 빌드
 
-로컬 개발 환경에서 프런트엔드와 백엔드를 따로 실행할 수도 있습니다.
+프로젝트 루트에서 실행:
 
-1.  **백엔드 실행 (Python):**
+```bash
+docker build -t dashblocks .
+```
 
-    ```bash
-    # (선택 사항) 가상 환경 생성 및 활성화
-    python -m venv .venv
-    # Windows: .\.venv\Scripts\Activate.ps1
-    # macOS/Linux: source ./.venv/bin/activate
+> ⚠️ `game_logic.cpp` 또는 `gomoku_ai.cpp`를 수정했다면
+> **반드시 다시 `docker build` 해야 변경 사항이 반영됩니다.**
 
-    # 의존성 설치
-    pip install -r server/requirements.txt
+---
 
-    # 서버 실행
-    python server/app.py
-    ```
+### 3.2 Docker 컨테이너 실행
 
-2.  **프런트엔드 개발 서버 실행 (React with Vite):**
+```bash
+docker run -d -p 5000:5000 --name dashblocks-game dashblocks
+```
 
-    ```bash
-    # 프런트엔드 의존성 설치
-    npm install
+* `-d` : 백그라운드 실행
+* `5000:5000` : 서버 포트 노출
 
-    # 개발 서버 실행
-    npm run dev
-    ```
-    프런트엔드는 보통 `http://localhost:5173`과 같은 주소에서 실행됩니다.
+---
 
-## 각 파일 설명
+### 3.3 접속
 
-- `eslint.config.js`: ESLint 설정 파일 (코드 스타일/검사 설정).
-- `index.html`: 웹앱의 루트 HTML 파일.
-- `package.json`: 프로젝트 메타데이터, 스크립트, 프론트엔드 의존성 목록.
-- `README.md`: 프로젝트 설명서(이 파일).
-- `vite.config.ts`: Vite 개발/번들 설정 (TypeScript).
-- `tsconfig.json`: TypeScript 컴파일러 설정 (클라이언트).
-- `tsconfig.node.json`: TypeScript 컴파일러 설정 (Node.js 환경 파일).
+브라우저에서 접속:
 
-- `client/`: 클라이언트 관련 코드/스크립트 폴더.
-  - `main.py`: 클라이언트 관련 Python 스크립트(프로젝트에 따라 역할이 다를 수 있음).
+```
+http://localhost:5000
+```
 
-- `public/`: 정적 자원(이미지, 폰트 등)을 두는 폴더.
+---
 
-- `server/`: 서버 쪽 소스와 테스트, 빌드 관련 파일들.
-  - `app_minimal.py`: 간단하거나 예제용 서버 애플리케이션.
-  - `app.py`: 메인 서버 애플리케이션(주요 엔드포인트 포함).
-  - `game_logic.cpp`: 게임 로직을 구현한 C++ 소스파일 (현재 Rust 마이그레이션 예정).
-  - `requirements.txt`: Python 의존성 목록(서버 실행에 필요한 패키지).
-  - `server.cpp`: C++로 작성된 서버 또는 관련 네이티브 코드.
-  - `test.cpp`: C++ 테스트/샘플 코드.
-  - `test.py`: Python 단위/통합 테스트 스크립트.
-  - `__pycache__/`: Python 바이트코드 캐시 디렉터리(자동 생성).
-  - `ai/gomoku_ai.cpp`: 오목(Gomoku) 인공지능 로직(C++).
+### 3.4 로그 확인 (선택)
 
-- `src/`: 프론트엔드 React 소스 코드 (TypeScript).
-  - `App.css`: 애플리케이션 전역 스타일.
-  - `App.tsx`: 메인 React 컴포넌트 (TypeScript).
-  - `Board.tsx`: 보드 표시용 컴포넌트 (TypeScript).
-  - `index.css`: 기본 스타일 시트.
-  - `main.tsx`: 프론트엔드 진입점(React 렌더링 시작 파일) (TypeScript).
-  - `Player.jsx`: 플레이어 관련 컴포넌트/로직 (JavaScript/JSX).
+```bash
+docker logs dashblocks-game
+```
+
+---
+
+### 3.5 컨테이너 중지 / 삭제
+
+```bash
+docker stop dashblocks-game
+docker rm dashblocks-game
+```
+
+---
+
+## 4. ⚠️ C++ 코드 수정 시 반드시 알아야 할 점
+
+이 프로젝트는 **Python에서 C++ DLL(SO)을 `ctypes`로 로드**합니다.
+
+### 중요한 사실
+
+* C++ 코드를 수정해도 **자동 반영되지 않습니다**
+* Docker 이미지에 DLL이 포함되므로,
+  **이미지를 다시 빌드해야 합니다**
+
+### 수정 반영 절차 (필수)
+
+```bash
+docker stop dashblocks-game
+docker rm dashblocks-game
+docker build -t dashblocks .
+docker run -d -p 5000:5000 --name dashblocks-game dashblocks
+```
+
+✔️ 이 과정을 거쳐야 C++ 로직 / AI 변경이 반영됩니다.
+
+---
+
+## 5. 로컬 개발 실행 (대안)
+
+Docker 없이 로컬에서 프런트엔드 / 백엔드를 개별 실행할 수 있습니다.
+
+---
+
+### 5.1 백엔드 실행 (Python)
+
+```bash
+cd server
+
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+
+pip install -r requirements.txt
+python app.py
+```
+
+서버 기본 주소:
+
+```
+http://localhost:5000
+```
+
+---
+
+### 5.2 프런트엔드 실행 (Vite)
+
+```bash
+npm install
+npm run dev
+```
+
+기본 주소:
+
+```
+http://localhost:5173
+```
+
+---
+
+## 6. 개발 참고 사항
+
+* Python 서버는 **상태 관리 / 네트워크 / 브로드캐스트 담당**
+* C++은 **게임 규칙 / AI / 성능 민감 로직 담당**
+* Socket.IO 기반 실시간 통신
+* AI는 추후 **네가맥스 / 알파베타 / Iterative Deepening** 확장 가능
