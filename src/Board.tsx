@@ -1,23 +1,39 @@
+import React from 'react';
+import Player from './Player.jsx';
 
-import React from 'react'
-import Player from './Player'
+// Define types for the component props
+interface PlayerData {
+  [id: string]: [[number, number]];
+}
+
+interface Stone {
+  r: number;
+  c: number;
+  color: 'black' | 'white';
+}
+
+interface BoardProps {
+  size?: number;
+  players?: PlayerData;
+  myId?: string | null;
+  members?: string[];
+  board?: Stone[];
+}
 
 // Board renders a square board with visible grid lines.
 // Player is positioned on intersections (0..size) for both axes.
-export default function Board({ size = 8, players = {}, myId = null, members = [], board = [] }) {
+export default function Board({ size = 8, players = {}, myId = null, members = [], board = [] }: BoardProps) {
     // size = number of cells per side; intersections = size + 1
-    const intersections = size + 1
+    const intersections = size + 1;
 
-    const palette = ['#ff4757', '#1e90ff', '#2ed573', '#ffa502', '#ff6b81', '#70a1ff', '#a55eea']
-
-
+    const palette = ['#ff4757', '#1e90ff', '#2ed573', '#ffa502', '#ff6b81', '#70a1ff', '#a55eea'];
 
     return (
-        <div className="board board-lines" style={{ ['--size']: size }}>
+        <div className="board board-lines" style={{ ['--size' as any]: size }}>
             {/* Render placed stones */}
             {board.map((item, i) => {
-                const topPct = (item.r / size) * 100
-                const leftPct = (item.c / size) * 100
+                const topPct = (item.r / size) * 100;
+                const leftPct = (item.c / size) * 100;
                 return (
                     <div
                         key={`stone-${i}`}
@@ -40,18 +56,14 @@ export default function Board({ size = 8, players = {}, myId = null, members = [
 
             {/* Render Players (Cursor) and Preview */}
             {Object.entries(players).map(([id, data]) => {
-                if (!data || !data[0]) return null
-                const [r, c] = data[0]
-                const topPct = (r / size) * 100
-                const leftPct = (c / size) * 100
-                const isMe = id === myId
-                const idx = members ? members.indexOf(id) : -1
-
-                // Cursor color - only for outline/indicator. The "Stone" is the main visual now.
-                // Or maybe we keep the player cursor as is? The request asked for "Preview".
-
-                // Let's render the Ghost Stone (Preview) if it's ME
-                const myColor = idx === 0 ? 'black' : idx === 1 ? 'white' : null
+                if (!data || !data[0]) return null;
+                const [r, c] = data[0];
+                const topPct = (r / size) * 100;
+                const leftPct = (c / size) * 100;
+                const isMe = id === myId;
+                const idx = members ? members.indexOf(id) : -1;
+                
+                const myColor = idx === 0 ? 'black' : idx === 1 ? 'white' : null;
 
                 return (
                     <React.Fragment key={id}>

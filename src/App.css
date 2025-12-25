@@ -108,7 +108,7 @@
   color: #2e7d32;
 }
 
-.status:contains("✗") {
+.status.disconnected {
   background: #ffebee;
   color: #c62828;
 }

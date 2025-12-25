@@ -1,19 +1,29 @@
+import eventlet
+eventlet.monkey_patch()
+
 import ctypes
 import os
 from flask import Flask, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_cors import CORS
-import eventlet
 
 # We must monkey patch early, but after some imports it might be safer to do it here
-eventlet.monkey_patch()
 
-app = Flask(__name__)
+
+app = Flask(__name__, static_folder='../dist', static_url_path='/')
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path != "" and os.path.exists(app.static_folder + '/' + path):
+        return app.send_static_file(path)
+    else:
+        return app.send_static_file('index.html')
+
 # --- C++ DLL Interop -----------------------------------------------------
-dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "game_logic.dll"))
+dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "game_logic.so"))
 print(f"DEBUG: Attempting to load DLL at {dll_path}")
 
 try:

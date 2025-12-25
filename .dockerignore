@@ -1,0 +1,21 @@
+# Git
+.git
+.gitignore
+
+# Node
+node_modules
+
+# Python
+.venv
+__pycache__
+*.pyc
+
+# VS Code
+.vscode
+.vs
+
+# Build artifacts
+dist
+*.dll
+*.exe
+*.so
