@@ -1,5 +1,5 @@
-import eventlet
-eventlet.monkey_patch()
+# import eventlet
+# eventlet.monkey_patch()
 
 import ctypes
 import os
@@ -12,7 +12,11 @@ from flask_cors import CORS
 
 app = Flask(__name__, static_folder='../dist', static_url_path='/')
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(
+    app,
+    async_mode="threading",
+    cors_allowed_origins="*"
+)
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
@@ -23,14 +27,24 @@ def serve(path):
         return app.send_static_file('index.html')
 
 # --- C++ DLL Interop -----------------------------------------------------
-dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "game_logic.so"))
-print(f"DEBUG: Attempting to load DLL at {dll_path}")
-
+# Try to load native lib: prefer POSIX .so if present, otherwise fall back to .dll
+so_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "game_logic.so"))
+dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "game_logic.dll"))
+lib_loaded = False
+print(f"DEBUG: Looking for native libs at {so_path} and {dll_path}")
 try:
-    game_lib = ctypes.CDLL(dll_path)
-    print("DEBUG: DLL Loaded Successfully")
+    if os.path.exists(so_path):
+        game_lib = ctypes.CDLL(so_path)
+        print(f"DEBUG: Loaded native lib {so_path}")
+        lib_loaded = True
+    elif os.path.exists(dll_path):
+        game_lib = ctypes.CDLL(dll_path)
+        print(f"DEBUG: Loaded native lib {dll_path}")
+        lib_loaded = True
+    else:
+        raise FileNotFoundError(f"No native library found at {so_path} or {dll_path}")
 except Exception as e:
-    print(f"DEBUG: DLL Load Failed: {e}")
+    print(f"DEBUG: Native lib load failed: {e}")
     raise e
 
 # void init_game(int room_id)
@@ -99,12 +113,27 @@ def broadcast_room(pw):
         color = 'black' if color_val == 1 else 'white'
         board_state.append({'r': r, 'c': c, 'color': color})
 
+    # If the native lib appended can_place_color after stones buffer, read it.
+    can_place_color_val = None
+    try:
+        raw_idx = sc * 3
+        if raw_idx < len(s_buf):
+            v = int(s_buf[raw_idx])
+            if v in (1, 2):
+                can_place_color_val = v
+    except Exception:
+        can_place_color_val = None
+
     room_name = f"room:{pw}"
-    socketio.emit('room_state', {
+    payload = {
         'members': members,
         'data': room_data,
         'board': board_state
-    }, room=room_name)
+    }
+    if can_place_color_val is not None:
+        payload['can_place_color'] = can_place_color_val
+
+    socketio.emit('room_state', payload, room=room_name)
 
 @socketio.on('connect')
 def handle_connect():
@@ -163,7 +192,7 @@ def handle_move(evt_data):
     broadcast_room(pw)
 
 @socketio.on('place_stone')
-def handle_place_stone():
+def handle_place_stone(evt_data=None):
     sid = request.sid
     pw = None
     members = []
@@ -182,10 +211,22 @@ def handle_place_stone():
     room_id = get_room_id(pw)
     pid = get_player_id(sid)
 
-    r, c = ctypes.c_int(0), ctypes.c_int(0)
-    game_lib.move_player(room_id, pid, 0, 0, ctypes.byref(r), ctypes.byref(c))
-    
-    success = game_lib.place_stone(room_id, r.value, c.value, color)
+    # Allow client to pass target coordinates {r, c}. If not provided, use player's current position.
+    r_val = None
+    c_val = None
+    try:
+        if evt_data and isinstance(evt_data, dict) and 'r' in evt_data and 'c' in evt_data:
+            r_val = int(evt_data.get('r'))
+            c_val = int(evt_data.get('c'))
+    except Exception:
+        r_val = None
+
+    if r_val is None or c_val is None:
+        r, c = ctypes.c_int(0), ctypes.c_int(0)
+        game_lib.move_player(room_id, pid, 0, 0, ctypes.byref(r), ctypes.byref(c))
+        r_val, c_val = r.value, c.value
+
+    success = game_lib.place_stone(room_id, int(r_val), int(c_val), color)
     if success:
         broadcast_room(pw)
 

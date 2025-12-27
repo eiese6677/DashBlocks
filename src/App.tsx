@@ -26,6 +26,7 @@ export default function App() {
   const [isAutoAI, setIsAutoAI] = useState(false);
 
   const [board, setBoard] = useState<Stone[]>([]);
+  const [canPlaceColor, setCanPlaceColor] = useState<number | null>(null); // 1=black,2=white
 
   const socketRef = useRef<Socket | null>(null);
   const posRef = useRef<[number, number]>([Math.floor(BOARD_SIZE / 2), Math.floor(BOARD_SIZE / 2)]);
@@ -50,11 +51,12 @@ export default function App() {
     socket.on('joined', () => setJoined(true));
     socket.on('join_error', (p: { reason?: string }) => alert('방 참여 실패: ' + (p?.reason || 'unknown')));
 
-    socket.on('room_state', (payload: { data?: PlayerData; members?: string[], board?: Stone[] }) => {
+    socket.on('room_state', (payload: { data?: PlayerData; members?: string[], board?: Stone[], can_place_color?: number }) => {
       if (!payload) return;
       setPlayers(payload.data || {});
       setMembers(payload.members || []);
       setBoard(payload.board || []);
+      setCanPlaceColor((payload as any).can_place_color ?? null);
 
       // We need to use the state from the argument because of the closure
       setMyId(myId => {
@@ -66,7 +68,9 @@ export default function App() {
       });
     });
 
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   // Auto AI Effect
@@ -109,7 +113,7 @@ export default function App() {
       if (k === 's' || k === 'arrowdown') move(0, 1);
       if (k === 'a' || k === 'arrowleft') move(-1, 0);
       if (k === 'd' || k === 'arrowright') move(1, 0);
-      if (k === 'enter') {
+      if (k === 'enter' || k === 'space') {
         const s = socketRef.current;
         if (s && s.connected) s.emit('place_stone');
       }
@@ -118,11 +122,22 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [move, joined]);
 
+  const placeAt = useCallback((r: number, c: number) => {
+    const s = socketRef.current;
+    if (s && s.connected && joined) s.emit('place_stone', { r, c });
+  }, [joined]);
+
   return (
     <div className="app-root">
-      <h1>체스판 (새로 작성된 버전)</h1>
+      <h1>오목</h1>
       <div className={`status ${connected ? 'connected' : 'disconnected'}`}>
         {connected ? '✓ 서버 연결됨' : '✗ 연결 중...'}
+        {canPlaceColor && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 12 }}>
+            <span style={{ width: 14, height: 14, borderRadius: 7, background: canPlaceColor === 1 ? '#000' : '#fff', border: '1px solid #777', marginRight: 8 }} />
+            <span style={{ fontWeight: 600 }}>{canPlaceColor === 1 ? 'Black' : 'White'} to place</span>
+          </span>
+        )}
       </div>
 
       <div style={{ margin: '0.5rem 0' }}>
@@ -131,7 +146,7 @@ export default function App() {
         <span style={{ marginLeft: 8 }}>{joined ? `Joined: ${roomPassword}` : 'Not joined'}</span>
       </div>
 
-      <Board size={BOARD_SIZE} players={players} myId={myId} members={members} board={board} />
+      <Board size={BOARD_SIZE} players={players} myId={myId} members={members} board={board} onPlace={placeAt} />
 
       <div className="controls">
         <button
