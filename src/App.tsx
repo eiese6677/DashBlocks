@@ -100,28 +100,6 @@ export default function App() {
     s.emit('join', { password: roomPassword });
   }, [roomPassword]);
 
-  const move = useCallback((dx: number, dy: number) => {
-    const s = socketRef.current;
-    if (s && s.connected && joined) s.emit('move', { dx, dy });
-  }, [joined]);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (!joined) return;
-      const k = e.key.toLowerCase();
-      if (k === 'w' || k === 'arrowup') move(0, -1);
-      if (k === 's' || k === 'arrowdown') move(0, 1);
-      if (k === 'a' || k === 'arrowleft') move(-1, 0);
-      if (k === 'd' || k === 'arrowright') move(1, 0);
-      if (k === 'enter' || k === 'space') {
-        const s = socketRef.current;
-        if (s && s.connected) s.emit('place_stone');
-      }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [move, joined]);
-
   const placeAt = useCallback((r: number, c: number) => {
     const s = socketRef.current;
     if (s && s.connected && joined) s.emit('place_stone', { r, c });

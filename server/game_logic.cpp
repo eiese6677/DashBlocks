@@ -325,17 +325,24 @@ struct AI_Board
     }
 };
 
+#if defined(_WIN32) || defined(_WIN64)
+#define EXPORT __declspec(dllexport)
+#else
+#define EXPORT __attribute__((visibility("default")))
+#endif
+
 extern "C"
 {
-    __declspec(dllexport) void init_game(int room_id)
+    EXPORT void init_game(int room_id)
     {
         int idx = room_id % MAX_ROOMS;
     }
 
-    __declspec(dllexport) void reset_game(int room_id)
+    EXPORT void reset_game(int room_id)
     {
         int idx = room_id % MAX_ROOMS;
         rooms[idx].stone_count = 0;
+        rooms[idx].can_place_color = 1;
         for (int i = 0; i < MAX_PLAYERS; ++i)
         {
             if (rooms[idx].players[i].active)
@@ -346,7 +353,7 @@ extern "C"
         }
     }
 
-    __declspec(dllexport) void move_player(int room_id, int player_id, int dx_in, int dy_in, int *out_r, int *out_c)
+    EXPORT void move_player(int room_id, int player_id, int dx_in, int dy_in, int *out_r, int *out_c)
     {
         int idx = room_id % MAX_ROOMS;
         GameRoom *room = &rooms[idx];
@@ -393,7 +400,7 @@ extern "C"
         }
     }
 
-    __declspec(dllexport) bool place_stone(int room_id, int r, int c, int color)
+    EXPORT bool place_stone(int room_id, int r, int c, int color)
     {
         int idx = room_id % MAX_ROOMS;
         GameRoom *room = &rooms[idx];
@@ -419,7 +426,7 @@ extern "C"
         return true;
     }
 
-    __declspec(dllexport) void get_ai_move(int room_id, int color, int *out_r, int *out_c)
+    EXPORT void get_ai_move(int room_id, int color, int *out_r, int *out_c)
     {
         int idx = room_id % MAX_ROOMS;
         AI_Board b;
@@ -517,7 +524,7 @@ extern "C"
         } // Default center
     }
 
-    __declspec(dllexport) void get_state(int room_id, int *players_buffer, int *out_p_count, int *stones_buffer, int *out_s_count)
+    EXPORT void get_state(int room_id, int *players_buffer, int *out_p_count, int *stones_buffer, int *out_s_count)
     {
         int idx = room_id % MAX_ROOMS;
         GameRoom *room = &rooms[idx];

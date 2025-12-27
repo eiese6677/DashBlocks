@@ -7,9 +7,6 @@ from flask import Flask, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_cors import CORS
 
-# We must monkey patch early, but after some imports it might be safer to do it here
-
-
 app = Flask(__name__, static_folder='../dist', static_url_path='/')
 CORS(app)
 socketio = SocketIO(
@@ -32,20 +29,7 @@ so_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "game_logic.so
 dll_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "game_logic.dll"))
 lib_loaded = False
 print(f"DEBUG: Looking for native libs at {so_path} and {dll_path}")
-try:
-    if os.path.exists(so_path):
-        game_lib = ctypes.CDLL(so_path)
-        print(f"DEBUG: Loaded native lib {so_path}")
-        lib_loaded = True
-    elif os.path.exists(dll_path):
-        game_lib = ctypes.CDLL(dll_path)
-        print(f"DEBUG: Loaded native lib {dll_path}")
-        lib_loaded = True
-    else:
-        raise FileNotFoundError(f"No native library found at {so_path} or {dll_path}")
-except Exception as e:
-    print(f"DEBUG: Native lib load failed: {e}")
-    raise e
+game_lib = ctypes.CDLL(so_path)
 
 # void init_game(int room_id)
 game_lib.init_game.argtypes = [ctypes.c_int]

@@ -33,7 +33,7 @@ COPY server/ ./server/
 # Compile the C++ game logic into a shared library
 # The sed command is used to remove Windows-specific dllexport attribute
 RUN sed -i 's/__declspec(dllexport)//g' server/game_logic.cpp && \
-    g++ -shared -fPIC -o server/game_logic.so server/game_logic.cpp
+    g++ -O2 -fPIC -shared -std=c++17 -o server/game_logic.so server/game_logic.cpp
 
 # Copy the built frontend from the builder stage
 COPY --from=frontend-builder /app/dist ./dist
